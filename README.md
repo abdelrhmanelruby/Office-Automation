@@ -7,11 +7,12 @@
 * ESP32CAM
 * Arduino UNO
 * MQ2
-* light sensor 
+* light Sensor 
 * DHT-11
-* RGB led
-* Magnetic reed switch
+* RGB Led
+* Magnetic Reed Switch
 * Solenoid Lock
-* Servo motor 
+* Servo Motor 
 * Buzzer
 * Water level sensor
+* Relay Module
