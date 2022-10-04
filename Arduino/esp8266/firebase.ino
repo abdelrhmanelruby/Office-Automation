@@ -1,3 +1,4 @@
+#include <Servo.h>
 #include <ESP8266WiFi.h>
 #include <SoftwareSerial.h>
 #include <FirebaseArduino.h>
@@ -5,31 +6,41 @@
 #include <ESP8266HTTPClient.h>
 #include <DHT.h>
 
-#define FIREBASE_HOST "********"                         
-#define FIREBASE_AUTH "********"             
 
+#define FIREBASE_HOST "********"
+#define FIREBASE_AUTH "********"
 #define WIFI_SSID "********"
 #define WIFI_PASSWORD "********"
-#define DHTPIN 2  
-#define DHTTYPE DHT11 
+#define DHTPIN 2
+#define DHTTYPE DHT11
 
+Servo servo;
 DHT dht(DHTPIN, DHTTYPE);
 
 bool light;
 bool rgb;
+bool DoorLock;
+bool Door;
+bool Security;
+int DoorState;
 int r, g, b;
-unsigned long previousMillis = 0; 
-const long interval = 10000;
+
+unsigned long previousMillis = 0;
+const long interval = 60000;
 void setup()
 {
-  pinMode(14, OUTPUT); //red
+  servo.attach(10); //tx for servomotor servo.write(0);
+  //delay(2000);
+
+
+  pinMode(14, OUTPUT);  //red
   pinMode(12, OUTPUT); //green
   pinMode(13, OUTPUT); //blue
-
-
-  pinMode(16, OUTPUT);
-  pinMode(4, OUTPUT); 
-  pinMode(5, OUTPUT); 
+  pinMode(0, OUTPUT); //doorlock
+  pinMode(5, INPUT_PULLUP); //doorstate
+  pinMode(16, OUTPUT); //alarm for gas
+  pinMode(4, OUTPUT); //for light sensor
+  pinMode(15, OUTPUT); //light
   Serial.begin(115200);
   delay(500);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -55,35 +66,33 @@ void setup()
 
 
 void readDatas() {
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
+  int h = dht.readHumidity();
+  int t = dht.readTemperature();
   int n = analogRead(A0);
   Serial.println(t);
   Serial.println(h);
-  Firebase.setFloat("Data/Temperature:", t);
-  Firebase.setFloat("Data/Humidity:", h);
-  Firebase.setFloat("Data/Gas detector:", n);
+  Serial.println(n);
+  Firebase.setInt("Data/Temperature:", t);
+  Firebase.setInt("Data/Humidity:", h);
+  Firebase.setInt("Data/Gas detector:", n);
 }
-
-
-
 
 
 void loop()
 {
   int n = analogRead(A0);
-  Serial.println(n);
-
   if (n > 600)
   {
     digitalWrite(16, HIGH);
-  } else     digitalWrite(16, LOW);
+  } else if (n < 600 && DoorState == 0) {
+    digitalWrite(16, LOW);
+  }
 
 
-  if (n < 25)
-  {
-    digitalWrite(4, HIGH);
-  } else     digitalWrite(4, LOW);  
+  // if (n < 35)
+  // {
+  //  digitalWrite(4, HIGH);
+  // } else  digitalWrite(4, LOW); //for light sensor
 
 
   rgb = Firebase.getBool("RgbState/switch");
@@ -100,20 +109,42 @@ void loop()
     digitalWrite(13, 0);
   }
 
+  DoorLock = Firebase.getBool("DoorLock/switch");
+  if (DoorLock == true)
+  {
+    digitalWrite(0, HIGH);
+  } else digitalWrite(0, LOW);
+
+
+  DoorState = digitalRead(D1);
+  Security = Firebase.getBool("Security/switch");
+  if (DoorState == 1 && Security == 0)
+  {
+    digitalWrite(16, HIGH);
+  } else if (n < 600 && DoorState == 0) {
+
+
+    digitalWrite(16, LOW);
+  }
+  Serial.println(DoorState);
+
+  Door = Firebase.getBool("Door/switch");
+  if (Door == 1) {
+    servo.write(90);
+  } else servo.write(0);
+
+
 
 
 
   light = Firebase.getBool("LightState/switch");
   //Serial.println(light);
   if (light == true) {
-    digitalWrite(5, HIGH); 
-  }
-  if (light == false) {
-    digitalWrite(5, LOW);
-  }
+    digitalWrite(15, HIGH);
+  } else digitalWrite(15, LOW);
+
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) { //to avoid reading the data from DHT sensor every second
-    readDatas();
+  if (currentMillis - previousMillis >= interval) { //to avoid reading the data from DHT sensor every second readDatas();
     previousMillis = currentMillis;
   }
 }
